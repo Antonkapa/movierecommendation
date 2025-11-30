@@ -1,0 +1,279 @@
+import * as SQLite from 'expo-sqlite';
+
+const db = SQLite.openDatabaseSync('movie_recommendations.db');
+
+export interface UserRating {
+  id: number;
+  movie_id: number;
+  rating: number; // 1-5 scale or -1 for dislike, 1 for like
+  timestamp: number;
+  movie_data?: string; // JSON string of movie details for offline access
+}
+
+export interface UserPreference {
+  id: number;
+  genre_id: number;
+  weight: number; // How much the user likes this genre
+}
+
+export const databaseService = {
+  initialize: () => {
+    try {
+      // Create user_ratings table
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS user_ratings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          movie_id INTEGER UNIQUE NOT NULL,
+          rating INTEGER NOT NULL,
+          timestamp INTEGER NOT NULL,
+          movie_data TEXT
+        );
+      `);
+
+      // Create user_preferences table for genre weights
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS user_preferences (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          genre_id INTEGER UNIQUE NOT NULL,
+          weight REAL DEFAULT 0
+        );
+      `);
+
+      // Create watchlist table
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS watchlist (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          movie_id INTEGER UNIQUE NOT NULL,
+          timestamp INTEGER NOT NULL,
+          movie_data TEXT
+        );
+      `);
+
+      // Create index for faster lookups
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_movie_id ON user_ratings(movie_id);
+      `);
+
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_genre_id ON user_preferences(genre_id);
+      `);
+
+      db.execSync(`
+        CREATE INDEX IF NOT EXISTS idx_watchlist_movie_id ON watchlist(movie_id);
+      `);
+
+      console.log('Database initialized successfully');
+    } catch (error) {
+      console.error('Error initializing database:', error);
+      throw error;
+    }
+  },
+
+  // Rate a movie (1-5 scale, or -1 for dislike, 1 for like in swipe mode)
+  rateMovie: (movieId: number, rating: number, movieData?: object): void => {
+    try {
+      const timestamp = Date.now();
+      const movieDataString = movieData ? JSON.stringify(movieData) : null;
+
+      db.runSync(
+        `INSERT OR REPLACE INTO user_ratings (movie_id, rating, timestamp, movie_data)
+         VALUES (?, ?, ?, ?)`,
+        [movieId, rating, timestamp, movieDataString]
+      );
+    } catch (error) {
+      console.error('Error rating movie:', error);
+      throw error;
+    }
+  },
+
+  // Get user's rating for a specific movie
+  getMovieRating: (movieId: number): number | null => {
+    try {
+      const result = db.getFirstSync<{ rating: number }>(
+        'SELECT rating FROM user_ratings WHERE movie_id = ?',
+        [movieId]
+      );
+      return result?.rating ?? null;
+    } catch (error) {
+      console.error('Error getting movie rating:', error);
+      return null;
+    }
+  },
+
+  // Get all user ratings
+  getAllRatings: (): UserRating[] => {
+    try {
+      const results = db.getAllSync<UserRating>(
+        'SELECT * FROM user_ratings ORDER BY timestamp DESC'
+      );
+      return results;
+    } catch (error) {
+      console.error('Error getting all ratings:', error);
+      return [];
+    }
+  },
+
+  // Get movies rated positively (rating >= 4 or rating = 1 for like)
+  getLikedMovies: (): UserRating[] => {
+    try {
+      const results = db.getAllSync<UserRating>(
+        'SELECT * FROM user_ratings WHERE rating >= 4 OR rating = 1 ORDER BY timestamp DESC'
+      );
+      return results;
+    } catch (error) {
+      console.error('Error getting liked movies:', error);
+      return [];
+    }
+  },
+
+  // Get movies rated negatively (rating <= 2 or rating = -1 for dislike)
+  getDislikedMovies: (): UserRating[] => {
+    try {
+      const results = db.getAllSync<UserRating>(
+        'SELECT * FROM user_ratings WHERE rating <= 2 OR rating = -1 ORDER BY timestamp DESC'
+      );
+      return results;
+    } catch (error) {
+      console.error('Error getting disliked movies:', error);
+      return [];
+    }
+  },
+
+  // Update genre preference weight
+  updateGenrePreference: (genreId: number, weight: number): void => {
+    try {
+      db.runSync(
+        `INSERT OR REPLACE INTO user_preferences (genre_id, weight)
+         VALUES (?, ?)`,
+        [genreId, weight]
+      );
+    } catch (error) {
+      console.error('Error updating genre preference:', error);
+      throw error;
+    }
+  },
+
+  // Get all genre preferences
+  getGenrePreferences: (): UserPreference[] => {
+    try {
+      const results = db.getAllSync<UserPreference>(
+        'SELECT * FROM user_preferences ORDER BY weight DESC'
+      );
+      return results;
+    } catch (error) {
+      console.error('Error getting genre preferences:', error);
+      return [];
+    }
+  },
+
+  // Get favorite genre IDs (top weighted genres)
+  getFavoriteGenreIds: (limit = 5): number[] => {
+    try {
+      const results = db.getAllSync<{ genre_id: number }>(
+        'SELECT genre_id FROM user_preferences WHERE weight > 0 ORDER BY weight DESC LIMIT ?',
+        [limit]
+      );
+      return results.map(r => r.genre_id);
+    } catch (error) {
+      console.error('Error getting favorite genres:', error);
+      return [];
+    }
+  },
+
+  // Check if user has rated enough movies for recommendations
+  hasEnoughRatings: (minRatings = 5): boolean => {
+    try {
+      const result = db.getFirstSync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM user_ratings'
+      );
+      return (result?.count ?? 0) >= minRatings;
+    } catch (error) {
+      console.error('Error checking ratings count:', error);
+      return false;
+    }
+  },
+
+  // Delete a rating
+  deleteRating: (movieId: number): void => {
+    try {
+      db.runSync('DELETE FROM user_ratings WHERE movie_id = ?', [movieId]);
+    } catch (error) {
+      console.error('Error deleting rating:', error);
+      throw error;
+    }
+  },
+
+  // Clear all data (for testing)
+  clearAllData: (): void => {
+    try {
+      db.runSync('DELETE FROM user_ratings');
+      db.runSync('DELETE FROM user_preferences');
+      db.runSync('DELETE FROM watchlist');
+      console.log('All data cleared');
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      throw error;
+    }
+  },
+
+  // Watchlist functions
+  addToWatchlist: (movieId: number, movieData?: object): void => {
+    try {
+      // Ensure watchlist table exists (migration for existing users)
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS watchlist (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          movie_id INTEGER UNIQUE NOT NULL,
+          timestamp INTEGER NOT NULL,
+          movie_data TEXT
+        );
+      `);
+
+      const timestamp = Date.now();
+      const movieDataString = movieData ? JSON.stringify(movieData) : null;
+
+      db.runSync(
+        `INSERT OR REPLACE INTO watchlist (movie_id, timestamp, movie_data)
+         VALUES (?, ?, ?)`,
+        [movieId, timestamp, movieDataString]
+      );
+    } catch (error) {
+      console.error('Error adding to watchlist:', error);
+      throw error;
+    }
+  },
+
+  removeFromWatchlist: (movieId: number): void => {
+    try {
+      db.runSync('DELETE FROM watchlist WHERE movie_id = ?', [movieId]);
+    } catch (error) {
+      console.error('Error removing from watchlist:', error);
+      throw error;
+    }
+  },
+
+  isInWatchlist: (movieId: number): boolean => {
+    try {
+      const result = db.getFirstSync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM watchlist WHERE movie_id = ?',
+        [movieId]
+      );
+      return (result?.count ?? 0) > 0;
+    } catch (error) {
+      console.error('Error checking watchlist:', error);
+      return false;
+    }
+  },
+
+  getWatchlist: (): UserRating[] => {
+    try {
+      const results = db.getAllSync<UserRating>(
+        'SELECT * FROM watchlist ORDER BY timestamp DESC'
+      );
+      return results;
+    } catch (error) {
+      console.error('Error getting watchlist:', error);
+      return [];
+    }
+  },
+};

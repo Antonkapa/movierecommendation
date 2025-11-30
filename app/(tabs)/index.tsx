@@ -1,98 +1,199 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Text, View, FlatList, ActivityIndicator, StyleSheet, Pressable } from "react-native";
+import { useEffect, useState } from "react";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { tmdbService } from "@/services/tmdb";
+import { databaseService } from "@/services/database";
+import { recommendationService } from "@/services/recommendations";
+import type { Movie } from "@/types/movie";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function Index() {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default function HomeScreen() {
+  useEffect(() => {
+    // Small delay to ensure layout is mounted
+    const timer = setTimeout(() => {
+      checkOnboarding();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const checkOnboarding = async () => {
+    // Check if user needs onboarding
+    const hasEnough = await databaseService.hasEnoughRatings(10);
+    if (!hasEnough) {
+      router.replace('/onboarding');
+      return;
+    }
+    loadMovies();
+  };
+
+  const loadMovies = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const recommendations = await recommendationService.getRecommendations();
+      setMovies(recommendations);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load movies");
+      console.error("Error loading movies:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoviePress = (movie: Movie) => {
+    router.push(`/movie/${movie.id}`);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>Loading movies...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+        <Text style={styles.errorHint}>
+          Make sure you've added your TMDB API key to the .env file
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Recommended for You</Text>
+      </View>
+      <Pressable
+        onPress={() => {
+          router.push('/onboarding');
+        }}
+        style={styles.refineButtonContainer}
+      >
+        <Text style={styles.refineButton}>+ Rate More</Text>
+      </Pressable>
+      <FlatList
+        data={movies}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <Pressable
+            style={styles.movieCard}
+            onPress={() => handleMoviePress(item)}
+          >
+            <Image
+              source={{ uri: tmdbService.getImageUrl(item.poster_path) || "" }}
+              style={styles.poster}
+              contentFit="cover"
             />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+            <View style={styles.movieInfo}>
+              <Text style={styles.movieTitle}>{item.title}</Text>
+              <Text style={styles.rating}>⭐ {item.vote_average.toFixed(1)}</Text>
+              <Text style={styles.overview} numberOfLines={3}>
+                {item.overview}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+        refreshing={loading}
+        onRefresh={loadMovies}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: 60,
   },
-  stepContainer: {
-    gap: 8,
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  refineButtonContainer: {
+    backgroundColor: "#1a1a1a",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4caf50",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  refineButton: {
+    fontSize: 14,
+    color: "#4caf50",
+    fontWeight: "600",
+  },
+  loadingText: {
+    marginTop: 12,
+    color: "#999",
+    fontSize: 16,
+  },
+  errorText: {
+    color: "#ff4444",
+    fontSize: 16,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  errorHint: {
+    color: "#999",
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 32,
+  },
+  movieCard: {
+    flexDirection: "row",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#222",
+  },
+  poster: {
+    width: 100,
+    height: 150,
+    borderRadius: 8,
+  },
+  movieInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  movieTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
+    marginBottom: 4,
+  },
+  rating: {
+    fontSize: 14,
+    color: "#ffd700",
+    marginBottom: 8,
+  },
+  overview: {
+    fontSize: 14,
+    color: "#ccc",
+    lineHeight: 20,
   },
 });
