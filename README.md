@@ -1,65 +1,208 @@
-# Welcome to your Expo app 👋
+# 🎬 Movie Recommendation App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A personalized movie recommendation mobile app built with Expo and React Native. Discover movies tailored to your taste through AI-powered recommendations, interactive rating, and intelligent search.
 
-## Get started
+## ✨ Features
 
-To start the app, in your terminal run:
+### 🎯 Personalized Recommendations
+- **Smart Recommendations**: Get movie suggestions based on your rating history and genre preferences
+- **Onboarding Flow**: Swipe through movies to rate them and build your taste profile (minimum 10 ratings required)
+- **Genre-Based Filtering**: Recommendations prioritize your favorite genres
 
-```bash
-npm run start
+### 🔍 Search & Discovery
+- **Movie Search**: Search for movies by title with real-time results
+- **Genre Browsing**: Browse movies by genre categories
+- **Trending Movies**: Discover what's popular this week
+- **Movie Details**: View comprehensive movie information including ratings, overview, and cast
+
+### 💬 AI Chat Assistant
+- **Personalized Movie Chat**: Chat with an AI assistant powered by Groq that understands your movie preferences
+- **Context-Aware Recommendations**: Get suggestions based on your mood and past ratings
+- **Natural Language Interaction**: Ask questions about movies in natural language
+
+### 👤 User Profile
+- **Watchlist**: Save movies you want to watch later
+- **Rating History**: View all movies you've liked and disliked
+- **Favorite Genres**: See your top 3 favorite genres based on your ratings
+- **Statistics**: Track your rating activity
+
+### 🔐 Authentication
+- **Supabase Auth**: Secure authentication with email/password
+- **Session Management**: Persistent login sessions
+- **Protected Routes**: Automatic redirect to auth screen when not logged in
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Expo](https://expo.dev) with React Native
+- **Language**: TypeScript
+- **Navigation**: Expo Router (file-based routing)
+- **Authentication**: [Supabase](https://supabase.com)
+- **Movie Data**: [The Movie Database (TMDB) API](https://www.themoviedb.org/documentation/api)
+- **AI Chat**: [Groq API](https://groq.com)
+- **Local Storage**: SQLite (via Expo SQLite)
+- **UI Components**: React Native with custom components
+- **State Management**: React Context API
+
+## 📱 Screens
+
+- **Home/For You** (`app/(tabs)/index.tsx`): Personalized movie recommendations
+- **Search** (`app/(tabs)/search.tsx`): Search, browse by genre, and view trending movies
+- **Chat** (`app/(tabs)/chat.tsx`): AI-powered movie recommendation chat
+- **Profile** (`app/(tabs)/profile.tsx`): User profile with watchlist and rating history
+- **Onboarding** (`app/onboarding.tsx`): Swipe-to-rate interface for building taste profile
+- **Auth** (`app/auth.tsx`): Login and signup screen
+- **Movie Detail** (`app/movie/[id].tsx`): Detailed movie information page
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or later)
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli`)
+- iOS Simulator (for Mac) or Android Emulator
+- API keys for:
+  - [TMDB](https://www.themoviedb.org/settings/api)
+  - [Supabase](https://supabase.com)
+  - [Groq](https://groq.com)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Antonkapa/movierecommendation.git
+   cd movie-recommendation
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   
+   Create a `.env` file in the root directory:
+   ```env
+   EXPO_PUBLIC_TMDB_API_KEY=your_tmdb_api_key
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   EXPO_PUBLIC_GROQ_API_KEY=your_groq_api_key
+   ```
+
+   See `.env.example` for reference.
+
+4. **Start the development server**
+   ```bash
+   npm start
+   ```
+
+5. **Run on your device/simulator**
+   - Press `i` for iOS simulator
+   - Press `a` for Android emulator
+   - Scan QR code with Expo Go app on your physical device
+
+## 📁 Project Structure
+
+```
+/
+├── app/                    # Expo Router screens
+│   ├── (tabs)/            # Tab navigation screens
+│   │   ├── index.tsx      # Home/Recommendations
+│   │   ├── search.tsx     # Search & Discovery
+│   │   ├── chat.tsx       # AI Chat
+│   │   └── profile.tsx    # User Profile
+│   ├── auth.tsx           # Authentication
+│   ├── onboarding.tsx    # Onboarding/Rating flow
+│   └── movie/[id].tsx     # Movie detail page
+├── components/            # Reusable components
+│   └── SwipeCard.tsx      # Swipeable movie card
+├── contexts/              # React Context providers
+│   └── AuthContext.tsx    # Authentication context
+├── services/              # Business logic services
+│   ├── database.ts        # Local SQLite database
+│   ├── tmdb.ts            # TMDB API integration
+│   ├── groq.ts            # Groq AI API integration
+│   └── recommendations.ts # Recommendation algorithm
+├── lib/                   # External library configs
+│   └── supabase.ts        # Supabase client
+├── types/                 # TypeScript type definitions
+│   └── movie.ts           # Movie-related types
+└── constants/             # App constants
+    └── config.ts          # Configuration values
 ```
 
-In the output, you'll find options to open the app in:
+## 🔧 Key Services
 
-- [a development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [an Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [an iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Database Service (`services/database.ts`)
+- Manages local SQLite database
+- Handles user ratings, watchlist, and preferences
+- Tracks favorite genres based on ratings
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### TMDB Service (`services/tmdb.ts`)
+- Fetches movie data from TMDB API
+- Handles search, trending, and genre filtering
+- Provides movie images and metadata
 
-## Workflows
+### Recommendation Service (`services/recommendations.ts`)
+- Generates personalized recommendations
+- Scores movies based on genre preferences
+- Filters out already-rated movies
 
-This project is configured to use [EAS Workflows](https://docs.expo.dev/eas/workflows/get-started/) to automate some development and release processes. These commands are set up in [`package.json`](./package.json) and can be run using NPM scripts in your terminal.
+### Groq Service (`services/groq.ts`)
+- Integrates with Groq AI for chat functionality
+- Provides context-aware movie recommendations
 
-### Previews
+## 🎨 Features in Detail
 
-Run `npm run draft` to [publish a preview update](https://docs.expo.dev/eas/workflows/examples/publish-preview-update/) of your project, which can be viewed in Expo Go or in a development build.
+### Onboarding Flow
+Users must rate at least 10 movies before accessing recommendations. The onboarding screen uses a swipeable card interface where users can:
+- Swipe right to like a movie
+- Swipe left to dislike a movie
+- View movie details before rating
 
-### Development Builds
+### Recommendation Algorithm
+The app uses a scoring system that considers:
+- Genre overlap with user preferences
+- TMDB rating and popularity
+- Vote count (reliability indicator)
+- Excludes already-rated movies
 
-Run `npm run development-builds` to [create a development build](https://docs.expo.dev/eas/workflows/examples/create-development-builds/). Note - you'll need to follow the [Prerequisites](https://docs.expo.dev/eas/workflows/examples/create-development-builds/#prerequisites) to ensure you have the correct emulator setup on your machine.
+### Watchlist
+Users can save movies to their watchlist from the movie detail page and manage them from the profile screen.
 
-### Production Deployments
+## 📦 Building for Production
 
-Run `npm run deploy` to [deploy to production](https://docs.expo.dev/eas/workflows/examples/deploy-to-production/). Note - you'll need to follow the [Prerequisites](https://docs.expo.dev/eas/workflows/examples/deploy-to-production/#prerequisites) to ensure you're set up to submit to the Apple and Google stores.
-
-## Hosting
-
-Expo offers hosting for websites and API functions via EAS Hosting. See the [Getting Started](https://docs.expo.dev/eas/hosting/get-started/) guide to learn more.
-
-
-## Get a fresh project
-
-When you're ready, run:
-
+### Development Build
 ```bash
-npm run reset-project
+npm run development-builds
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Production Build
+```bash
+npx eas-cli@latest build --platform ios
+npx eas-cli@latest build --platform android
+```
 
-## Learn more
+### Deploy
+```bash
+npm run deploy
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## 🤝 Contributing
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Join the community
+## 📄 License
 
-Join our community of developers creating universal apps.
+This project is licensed under the 0BSD License.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 🙏 Acknowledgments
+
+- [The Movie Database (TMDB)](https://www.themoviedb.org/) for movie data
+- [Supabase](https://supabase.com) for authentication
+- [Groq](https://groq.com) for AI chat capabilities
+- [Expo](https://expo.dev) for the amazing development platform
+
+---
+
+Built with ❤️ using Expo and React Native
