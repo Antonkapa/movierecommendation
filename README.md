@@ -1,6 +1,6 @@
 # 🎬 Movie Recommendation App
 
-A personalized movie recommendation mobile app built with Expo and React Native. Discover movies tailored to your taste through AI-powered recommendations, interactive rating, and intelligent search.
+An AI powered personalized movie recommendation mobile app built with Expo and React Native. Discover movies tailored to your taste through smart recommendations, interactive rating, and **intelligent** search.
 
 ## ✨ Features
 

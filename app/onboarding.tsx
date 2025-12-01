@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
-import { router } from 'expo-router';
 import { SwipeCard } from '@/components/SwipeCard';
-import { tmdbService } from '@/services/tmdb';
 import { databaseService } from '@/services/database';
+import { tmdbService } from '@/services/tmdb';
 import type { Movie } from '@/types/movie';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 const MIN_RATINGS = 10; // Minimum number of ratings before proceeding
 const PRELOAD_THRESHOLD = 3; // Start loading more when this many cards left
@@ -72,22 +72,81 @@ export default function OnboardingScreen() {
     const ratedMovies = await databaseService.getAllRatings();
     const ratedMovieIds = new Set(ratedMovies.map(r => r.movie_id));
 
-    // Fetch one page at a time for faster initial load
-    const pageType = page % 3;
-    let response;
+    // Diverse fetching strategy: mix years, genres, and sort methods
+    const currentYear = new Date().getFullYear();
+    const yearRanges = [
+      { min: currentYear - 3, max: currentYear }, // Very recent (last 3 years)
+      { min: currentYear - 10, max: currentYear - 4 }, // Recent (4-10 years ago)
+      { min: 2000, max: currentYear - 11 }, // 2000s era
+      { min: 1990, max: 1999 }, // 90s classics
+      { min: 1980, max: 1989 }, // 80s classics
+      { min: 1970, max: 1979 }, // 70s classics
+    ];
 
-    if (pageType === 1) {
-      response = await tmdbService.getTopRatedMovies(Math.ceil(page / 3));
-    } else if (pageType === 2) {
-      response = await tmdbService.getPopularMovies(Math.ceil(page / 3));
-    } else {
-      response = await tmdbService.getTrendingMovies('week');
+    const popularGenres = [28, 12, 35, 18, 27, 878, 53]; // Action, Adventure, Comedy, Drama, Horror, Sci-Fi, Thriller
+
+    const sortMethods = [
+      'popularity.desc',
+      'vote_average.desc',
+      'vote_count.desc',
+      'primary_release_date.desc',
+    ];
+
+    // Fetch multiple diverse batches
+    const fetchPromises: Promise<any>[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      // Random year range (weighted towards more recent)
+      const yearRangeIndex = Math.random() < 0.4 ? 0 :
+                             Math.random() < 0.7 ? 1 :
+                             Math.random() < 0.85 ? 2 :
+                             Math.random() < 0.93 ? 3 :
+                             Math.random() < 0.97 ? 4 : 5;
+
+      const yearRange = yearRanges[yearRangeIndex];
+      const randomYear = Math.floor(Math.random() * (yearRange.max - yearRange.min + 1)) + yearRange.min;
+
+      // Random genre
+      const randomGenre = popularGenres[Math.floor(Math.random() * popularGenres.length)];
+
+      // Random sort method
+      const sortBy = sortMethods[Math.floor(Math.random() * sortMethods.length)];
+
+      // Random page number
+      const randomPage = Math.floor(Math.random() * 3) + 1;
+
+      fetchPromises.push(
+        tmdbService.discoverMovies({
+          year: randomYear,
+          genre: randomGenre,
+          page: randomPage,
+          sortBy,
+          minVoteCount: randomYear < 2000 ? 30 : 50,
+          minVoteAverage: 5.0,
+        })
+      );
     }
 
-    // Filter out already rated movies
-    const unrated = response.results.filter(movie => !ratedMovieIds.has(movie.id));
+    // Also add one batch of trending/popular for familiarity
+    if (Math.random() < 0.5) {
+      fetchPromises.push(tmdbService.getTrendingMovies('week'));
+    } else {
+      fetchPromises.push(tmdbService.getPopularMovies(1));
+    }
 
-    // Shuffle for variety
+    const results = await Promise.all(fetchPromises);
+
+    // Combine all results
+    const allMovies = results.flatMap(result => result.results);
+
+    // Remove duplicates and already rated
+    const uniqueMovies = Array.from(
+      new Map(allMovies.map(movie => [movie.id, movie])).values()
+    );
+
+    const unrated = uniqueMovies.filter(movie => !ratedMovieIds.has(movie.id));
+
+    // Shuffle for maximum variety
     return unrated.sort(() => Math.random() - 0.5);
   };
 

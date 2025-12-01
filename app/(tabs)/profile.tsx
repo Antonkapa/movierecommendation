@@ -1,24 +1,37 @@
-import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  FlatList,
-  Alert,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import type { UserRating } from '@/services/database';
 import { databaseService } from '@/services/database';
 import { tmdbService } from '@/services/tmdb';
-import type { UserRating } from '@/services/database';
+import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
+
+interface TasteProfile {
+  keywords: string[];
+  directors: string[];
+  actors: string[];
+  studios: string[];
+}
 
 export default function ProfileScreen() {
   const [watchlist, setWatchlist] = useState<UserRating[]>([]);
   const [ratedMovies, setRatedMovies] = useState<UserRating[]>([]);
   const [activeTab, setActiveTab] = useState<'watchlist' | 'rated'>('watchlist');
   const [favoriteGenres, setFavoriteGenres] = useState<number[]>([]);
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile>({
+    keywords: [],
+    directors: [],
+    actors: [],
+    studios: [],
+  });
+  const [tasteProfileExpanded, setTasteProfileExpanded] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -33,6 +46,69 @@ export default function ProfileScreen() {
     setWatchlist(watchlistData);
     setRatedMovies(ratingsData);
     setFavoriteGenres(genres);
+
+    // Build taste profile
+    buildTasteProfile(ratingsData);
+  };
+
+  const buildTasteProfile = (ratings: UserRating[]) => {
+    const likedMovies = ratings.filter(r => r.rating === 1);
+
+    const keywordMap = new Map<string, number>();
+    const directorMap = new Map<string, number>();
+    const actorMap = new Map<string, number>();
+    const studioMap = new Map<string, number>();
+
+    for (const movie of likedMovies) {
+      const data = movie.movie_data
+        ? typeof movie.movie_data === 'string'
+          ? JSON.parse(movie.movie_data)
+          : movie.movie_data
+        : {};
+
+      // Count keywords
+      if (data.keywords && Array.isArray(data.keywords)) {
+        for (const keyword of data.keywords) {
+          keywordMap.set(keyword, (keywordMap.get(keyword) || 0) + 1);
+        }
+      }
+
+      // Count directors
+      if (data.director) {
+        directorMap.set(data.director, (directorMap.get(data.director) || 0) + 1);
+      }
+
+      // Count actors
+      if (data.actors && Array.isArray(data.actors)) {
+        for (const actor of data.actors) {
+          actorMap.set(actor, (actorMap.get(actor) || 0) + 1);
+        }
+      }
+
+      // Count studios
+      if (data.production_company) {
+        studioMap.set(data.production_company, (studioMap.get(data.production_company) || 0) + 1);
+      }
+    }
+
+    setTasteProfile({
+      keywords: Array.from(keywordMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([keyword]) => keyword),
+      directors: Array.from(directorMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([director]) => director),
+      actors: Array.from(actorMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([actor]) => actor),
+      studios: Array.from(studioMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([studio]) => studio),
+    });
   };
 
   const handleClearData = () => {
@@ -144,6 +220,81 @@ export default function ProfileScreen() {
           <Text style={styles.actionButtonText}>Clear All Data</Text>
         </Pressable>
       </View>
+
+      {/* Taste Profile */}
+      {(tasteProfile.keywords.length > 0 || tasteProfile.directors.length > 0 ||
+        tasteProfile.actors.length > 0 || tasteProfile.studios.length > 0) && (
+        <View style={styles.tasteProfileSection}>
+          <Pressable
+            style={styles.tasteProfileHeader}
+            onPress={() => setTasteProfileExpanded(!tasteProfileExpanded)}
+          >
+            <View>
+              <Text style={styles.sectionTitle}>Your Taste Profile</Text>
+              <Text style={styles.sectionSubtitle}>
+                Based on {likedCount} movies you liked
+              </Text>
+            </View>
+            <Text style={styles.chevron}>{tasteProfileExpanded ? '▼' : '▶'}</Text>
+          </Pressable>
+
+          {tasteProfileExpanded && (
+            <>
+              {tasteProfile.keywords.length > 0 && (
+                <View style={styles.profileCategory}>
+                  <Text style={styles.categoryTitle}>🏷️ Favorite Themes</Text>
+                  <View style={styles.chipContainer}>
+                    {tasteProfile.keywords.map((keyword, index) => (
+                      <View key={index} style={styles.profileChip}>
+                        <Text style={styles.profileChipText}>{keyword}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {tasteProfile.directors.length > 0 && (
+                <View style={styles.profileCategory}>
+                  <Text style={styles.categoryTitle}>🎬 Favorite Directors</Text>
+                  <View style={styles.chipContainer}>
+                    {tasteProfile.directors.map((director, index) => (
+                      <View key={index} style={styles.profileChip}>
+                        <Text style={styles.profileChipText}>{director}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {tasteProfile.actors.length > 0 && (
+                <View style={styles.profileCategory}>
+                  <Text style={styles.categoryTitle}>⭐ Favorite Actors</Text>
+                  <View style={styles.chipContainer}>
+                    {tasteProfile.actors.map((actor, index) => (
+                      <View key={index} style={styles.profileChip}>
+                        <Text style={styles.profileChipText}>{actor}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {tasteProfile.studios.length > 0 && (
+                <View style={styles.profileCategory}>
+                  <Text style={styles.categoryTitle}>🎞️ Favorite Studios</Text>
+                  <View style={styles.chipContainer}>
+                    {tasteProfile.studios.map((studio, index) => (
+                      <View key={index} style={styles.profileChip}>
+                        <Text style={styles.profileChipText}>{studio}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      )}
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -257,6 +408,63 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  tasteProfileSection: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  tasteProfileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#999',
+  },
+  chevron: {
+    fontSize: 16,
+    color: '#4caf50',
+    marginLeft: 12,
+  },
+  profileCategory: {
+    marginBottom: 16,
+  },
+  categoryTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ccc',
+    marginBottom: 10,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  profileChip: {
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#4caf50',
+  },
+  profileChipText: {
+    color: '#4caf50',
+    fontSize: 13,
     fontWeight: '600',
   },
   tabs: {

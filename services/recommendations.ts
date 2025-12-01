@@ -157,7 +157,8 @@ export const recommendationService = {
           percentage,
           item.rawScoreData,
           favoriteGenres,
-          likedMovies.length
+          likedMovies.length,
+          tasteProfile
         );
 
         return {
@@ -284,21 +285,31 @@ function calculateMovieScore(
 } {
   let score = 0;
 
+  // Tracking for match breakdown
+  const keywordMatches: string[] = [];
+  let directorMatch: string | null = null;
+  const actorMatches: string[] = [];
+  let studioMatch: string | null = null;
+
   // Genre matching is most important (heavily weight personalization)
   const genreMatches = movie.genre_ids.filter(id => favoriteGenres.includes(id));
   const genreMatchCount = genreMatches.length;
-  score += genreMatchCount * 100; // Increased from 50 to 100
+  score += genreMatchCount * 100;
+
+  // Note: We can't match keywords/cast/crew for recommended movies from discover
+  // because that data isn't included. We'll show user's taste profile in breakdown instead.
+  // This metadata is only available for movies they've already rated via detail page.
 
   // Quality score (TMDB rating) - moderate weight
   const qualityScore = movie.vote_average * 15;
   score += qualityScore;
 
   // Reliability bonus (vote count) - ensure it's not too obscure
-  const voteCountScore = Math.min(Math.log(movie.vote_count + 1) * 3, 30); // Cap at 30
+  const voteCountScore = Math.min(Math.log(movie.vote_count + 1) * 3, 30);
   score += voteCountScore;
 
   // Popularity - reduced weight to prevent new movie bias
-  const popularityScore = Math.min(Math.log(movie.popularity + 1) * 2, 20); // Reduced and capped
+  const popularityScore = Math.min(Math.log(movie.popularity + 1) * 2, 20);
   score += popularityScore;
 
   // Age diversity bonus - favor a mix of old and new
@@ -309,7 +320,6 @@ function calculateMovieScore(
   let ageCategory = 'Recent';
   let ageBonus = 0;
 
-  // Slightly favor older movies to counteract recency bias
   if (movieAge > 40) {
     ageCategory = 'Classic';
     ageBonus = 20;
@@ -331,16 +341,24 @@ function calculateMovieScore(
         : disliked.movie_data
       : {};
 
-    // If this movie shares genres with disliked movies, penalize it
     if (dislikedData.genre_ids) {
       const sharedGenres = movie.genre_ids.filter(
         (id: number) => dislikedData.genre_ids?.includes(id)
       );
-      score -= sharedGenres.length * 15; // Penalty for shared genres with dislikes
+      score -= sharedGenres.length * 15;
     }
   }
 
-  return { score, genreMatchCount, ageCategory, qualityScore };
+  return {
+    score,
+    genreMatchCount,
+    ageCategory,
+    qualityScore,
+    keywordMatches,
+    directorMatch,
+    actorMatches,
+    studioMatch,
+  };
 }
 
 /**
@@ -349,9 +367,18 @@ function calculateMovieScore(
 function createMatchBreakdown(
   movie: Movie,
   percentage: number,
-  scoreData: { genreMatchCount: number; ageCategory: string; qualityScore: number },
+  scoreData: {
+    genreMatchCount: number;
+    ageCategory: string;
+    qualityScore: number;
+    keywordMatches: string[];
+    directorMatch: string | null;
+    actorMatches: string[];
+    studioMatch: string | null;
+  },
   favoriteGenres: number[],
-  totalLikedMovies: number
+  totalLikedMovies: number,
+  tasteProfile: TasteProfile
 ): MatchBreakdown {
   const matchedGenreIds = movie.genre_ids.filter(id => favoriteGenres.includes(id));
   const genreMatchNames = matchedGenreIds.map(id => GENRE_NAMES[id] || 'Unknown');
@@ -375,10 +402,39 @@ function createMatchBreakdown(
     reasons.push('Strong genre alignment with your taste');
   }
 
+  // Show user's taste profile insights
+  const topKeywords = Array.from(tasteProfile.favoriteKeywords.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([keyword]) => keyword);
+
+  const topDirectors = Array.from(tasteProfile.favoriteDirectors.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([director]) => director);
+
+  const topActors = Array.from(tasteProfile.favoriteActors.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([actor]) => actor);
+
+  const topStudios = Array.from(tasteProfile.favoriteStudios.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([studio]) => studio);
+
   return {
     percentage: Math.round(percentage),
     genreMatches: scoreData.genreMatchCount,
     genreMatchNames,
+    keywordMatches: topKeywords.length,
+    keywordMatchNames: topKeywords,
+    directorMatch: topDirectors.length > 0,
+    directorName: topDirectors[0],
+    actorMatches: topActors.length,
+    actorMatchNames: topActors,
+    productionCompanyMatch: topStudios.length > 0,
+    productionCompanyName: topStudios[0],
     qualityScore: movie.vote_average,
     ageCategory: scoreData.ageCategory,
     totalLikedMovies,

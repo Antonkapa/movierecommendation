@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { tmdbService } from '@/services/tmdb';
 import type { Movie, Genre } from '@/types/movie';
 
