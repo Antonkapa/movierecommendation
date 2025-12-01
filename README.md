@@ -2,17 +2,15 @@
 
 An AI powered personalized movie recommendation mobile app built with Expo and React Native. Discover movies tailored to your taste through smart recommendations, interactive rating, and **intelligent** search.
 
-## ✨ Features
+## Features
 
 ### 🎯 Personalized Recommendations
 - **Smart Recommendations**: Get movie suggestions based on your rating history and genre preferences
 - **Onboarding Flow**: Swipe through movies to rate them and build your taste profile (minimum 10 ratings required)
-- **Genre-Based Filtering**: Recommendations prioritize your favorite genres
 
 ### 🔍 Search & Discovery
 - **Movie Search**: Search for movies by title with real-time results
 - **Genre Browsing**: Browse movies by genre categories
-- **Trending Movies**: Discover what's popular this week
 - **Movie Details**: View comprehensive movie information including ratings, overview, and cast
 
 ### 💬 AI Chat Assistant
@@ -23,7 +21,6 @@ An AI powered personalized movie recommendation mobile app built with Expo and R
 ### 👤 User Profile
 - **Watchlist**: Save movies you want to watch later
 - **Rating History**: View all movies you've liked and disliked
-- **Favorite Genres**: See your top 3 favorite genres based on your ratings
 - **Statistics**: Track your rating activity
 
 ## 🛠️ Tech Stack
