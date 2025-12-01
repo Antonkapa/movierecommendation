@@ -95,29 +95,47 @@ export default function OnboardingScreen() {
     const movie = movies[currentIndex];
     if (!movie) return;
 
+    // Immediately update UI for responsiveness
+    const newCount = ratingsCount + 1;
+    setRatingsCount(newCount);
+    goToNextMovie();
+
     // Store rating: 1 for like, -1 for dislike
     const rating = isLike ? 1 : -1;
-    await databaseService.rateMovie(movie.id, rating, {
+
+    // Run database operations in the background (fire-and-forget)
+    const saveRating = databaseService.rateMovie(movie.id, rating, {
       title: movie.title,
       poster_path: movie.poster_path,
       vote_average: movie.vote_average,
+      genre_ids: movie.genre_ids,
     });
 
-    // Update genre preferences
+    // Update genre preferences in parallel if it's a like
     if (isLike) {
-      const currentPrefs = await databaseService.getGenrePreferences();
-      for (const genreId of movie.genre_ids) {
-        const existing = currentPrefs.find(p => p.genre_id === genreId);
-        const newWeight = (existing?.weight || 0) + 1;
-        await databaseService.updateGenrePreference(genreId, newWeight);
-      }
+      const updatePreferences = async () => {
+        const currentPrefs = await databaseService.getGenrePreferences();
+
+        // Batch all genre updates in parallel
+        await Promise.all(
+          movie.genre_ids.map(async (genreId) => {
+            const existing = currentPrefs.find(p => p.genre_id === genreId);
+            const newWeight = (existing?.weight || 0) + 1;
+            return databaseService.updateGenrePreference(genreId, newWeight);
+          })
+        );
+      };
+
+      // Run both operations in parallel, but don't block the UI
+      Promise.all([saveRating, updatePreferences()]).catch(error => {
+        console.error('Error saving rating:', error);
+      });
+    } else {
+      // For dislikes, just save the rating
+      saveRating.catch(error => {
+        console.error('Error saving rating:', error);
+      });
     }
-
-    const newCount = ratingsCount + 1;
-    setRatingsCount(newCount);
-
-    // Move to next movie
-    goToNextMovie();
   };
 
   const handleSkipMovie = () => {

@@ -52,39 +52,76 @@ export default function MovieDetailScreen() {
   const toggleWatchlist = async () => {
     if (!movie) return;
 
-    if (inWatchlist) {
-      await databaseService.removeFromWatchlist(movie.id);
-    } else {
-      await databaseService.addToWatchlist(movie.id, {
-        title: movie.title,
-        poster_path: movie.poster_path,
-        vote_average: movie.vote_average,
-      });
+    // Optimistically update UI immediately
+    const newStatus = !inWatchlist;
+    setInWatchlist(newStatus);
+
+    // Run database operation in background
+    try {
+      if (newStatus) {
+        await databaseService.addToWatchlist(movie.id, {
+          title: movie.title,
+          poster_path: movie.poster_path,
+          vote_average: movie.vote_average,
+        });
+      } else {
+        await databaseService.removeFromWatchlist(movie.id);
+      }
+    } catch (error) {
+      // Revert on error
+      console.error('Error updating watchlist:', error);
+      setInWatchlist(!newStatus);
     }
-    setInWatchlist(!inWatchlist);
   };
 
   const handleRating = async (rating: number) => {
     if (!movie) return;
 
-    // Save rating to database
-    await databaseService.rateMovie(movie.id, rating, {
+    // Immediately update UI for responsiveness
+    setUserRating(rating);
+
+    // Save rating to database with rich metadata
+    const director = movie.credits?.crew?.find(c => c.job === 'Director');
+    const topActors = movie.credits?.cast?.slice(0, 5).map(a => a.name) || [];
+    const keywords = movie.keywords?.keywords?.map(k => k.name) || [];
+    const productionCompany = movie.production_companies?.[0]?.name;
+
+    const saveRating = databaseService.rateMovie(movie.id, rating, {
       title: movie.title,
       poster_path: movie.poster_path,
       vote_average: movie.vote_average,
+      genre_ids: movie.genres.map(g => g.id),
+      director: director?.name,
+      actors: topActors,
+      keywords: keywords.slice(0, 10), // Top 10 keywords
+      production_company: productionCompany,
     });
 
-    // Update genre preferences for likes
+    // Update genre preferences for likes (run in background)
     if (rating >= 4 || rating === 1) {
-      const currentPrefs = await databaseService.getGenrePreferences();
-      for (const genre of movie.genres) {
-        const existing = currentPrefs.find((p) => p.genre_id === genre.id);
-        const newWeight = (existing?.weight || 0) + 1;
-        await databaseService.updateGenrePreference(genre.id, newWeight);
-      }
-    }
+      const updatePreferences = async () => {
+        const currentPrefs = await databaseService.getGenrePreferences();
 
-    setUserRating(rating);
+        // Batch all genre updates in parallel
+        await Promise.all(
+          movie.genres.map(async (genre) => {
+            const existing = currentPrefs.find((p) => p.genre_id === genre.id);
+            const newWeight = (existing?.weight || 0) + 1;
+            return databaseService.updateGenrePreference(genre.id, newWeight);
+          })
+        );
+      };
+
+      // Run both operations in parallel, but don't block the UI
+      Promise.all([saveRating, updatePreferences()]).catch(error => {
+        console.error('Error saving rating:', error);
+      });
+    } else {
+      // For dislikes, just save the rating
+      saveRating.catch(error => {
+        console.error('Error saving rating:', error);
+      });
+    }
   };
 
   const openTrailer = () => {

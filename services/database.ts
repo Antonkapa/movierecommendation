@@ -5,7 +5,7 @@ export interface UserRating {
   movie_id: number;
   rating: number;
   timestamp: number;
-  movie_data?: string;
+  movie_data?: string | any; // Can be string or object depending on Supabase serialization
 }
 
 export interface UserPreference {

@@ -1,16 +1,18 @@
-import { Text, View, FlatList, ActivityIndicator, StyleSheet, Pressable } from "react-native";
+import { Text, View, FlatList, ActivityIndicator, StyleSheet, Pressable, Modal } from "react-native";
 import { useEffect, useState } from "react";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { tmdbService } from "@/services/tmdb";
 import { databaseService } from "@/services/database";
 import { recommendationService } from "@/services/recommendations";
-import type { Movie } from "@/types/movie";
+import type { MovieWithMatch, MatchBreakdown } from "@/types/movie";
 
 export default function Index() {
-  const [movies, setMovies] = useState<Movie[]>([]);
+  const [movies, setMovies] = useState<MovieWithMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<MatchBreakdown | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
     // Small delay to ensure layout is mounted
@@ -35,7 +37,9 @@ export default function Index() {
     try {
       setLoading(true);
       setError(null);
-      const recommendations = await recommendationService.getRecommendations();
+      // Use random page number (1-5) to get different recommendations each time
+      const randomPage = Math.floor(Math.random() * 5) + 1;
+      const recommendations = await recommendationService.getRecommendations(randomPage);
       setMovies(recommendations);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load movies");
@@ -45,8 +49,20 @@ export default function Index() {
     }
   };
 
-  const handleMoviePress = (movie: Movie) => {
-    router.push(`/movie/${movie.id}`);
+  const handleMoviePress = (movieId: number) => {
+    router.push(`/movie/${movieId}`);
+  };
+
+  const handleMatchPress = (match: MatchBreakdown) => {
+    setSelectedMatch(match);
+    setShowBreakdown(true);
+  };
+
+  const getMatchColor = (percentage: number) => {
+    if (percentage >= 90) return '#4caf50'; // Green
+    if (percentage >= 75) return '#8bc34a'; // Light green
+    if (percentage >= 60) return '#ffc107'; // Yellow
+    return '#ff9800'; // Orange
   };
 
   if (loading) {
@@ -73,40 +89,140 @@ export default function Index() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Recommended for You</Text>
+        <Text style={styles.subtitle}>
+          Personalized picks from your favorite genres
+        </Text>
       </View>
-      <Pressable
-        onPress={() => {
-          router.push('/onboarding');
-        }}
-        style={styles.refineButtonContainer}
-      >
-        <Text style={styles.refineButton}>+ Rate More</Text>
-      </Pressable>
+      <View style={styles.buttonRow}>
+        <Pressable
+          onPress={() => router.push('/onboarding')}
+          style={[styles.actionButton, styles.rateButton]}
+        >
+          <Text style={styles.actionButtonText}>+ Rate More</Text>
+        </Pressable>
+        <Pressable
+          onPress={loadMovies}
+          style={[styles.actionButton, styles.refreshButton]}
+        >
+          <Text style={styles.actionButtonText}>🔄 Refresh</Text>
+        </Pressable>
+      </View>
       <FlatList
         data={movies}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.movieCard}
-            onPress={() => handleMoviePress(item)}
-          >
-            <Image
-              source={{ uri: tmdbService.getImageUrl(item.poster_path) || "" }}
-              style={styles.poster}
-              contentFit="cover"
-            />
-            <View style={styles.movieInfo}>
-              <Text style={styles.movieTitle}>{item.title}</Text>
-              <Text style={styles.rating}>⭐ {item.vote_average.toFixed(1)}</Text>
-              <Text style={styles.overview} numberOfLines={3}>
-                {item.overview}
-              </Text>
-            </View>
-          </Pressable>
+          <View style={styles.movieCard}>
+            <Pressable
+              style={styles.movieContent}
+              onPress={() => handleMoviePress(item.id)}
+            >
+              <Image
+                source={{ uri: tmdbService.getImageUrl(item.poster_path) || "" }}
+                style={styles.poster}
+                contentFit="cover"
+              />
+              <View style={styles.movieInfo}>
+                <Text style={styles.movieTitle}>{item.title}</Text>
+                <View style={styles.metaRow}>
+                  <Text style={styles.rating}>⭐ {item.vote_average.toFixed(1)}</Text>
+                  {item.matchScore && (
+                    <Pressable
+                      style={[
+                        styles.matchBadge,
+                        { borderColor: getMatchColor(item.matchScore.percentage) },
+                      ]}
+                      onPress={() => handleMatchPress(item.matchScore!)}
+                    >
+                      <Text
+                        style={[
+                          styles.matchText,
+                          { color: getMatchColor(item.matchScore.percentage) },
+                        ]}
+                      >
+                        {item.matchScore.percentage}% Match
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+                <Text style={styles.overview} numberOfLines={3}>
+                  {item.overview}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
         )}
         refreshing={loading}
         onRefresh={loadMovies}
       />
+
+      {/* Match Breakdown Modal */}
+      <Modal
+        visible={showBreakdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBreakdown(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowBreakdown(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {selectedMatch && (
+              <>
+                <View style={styles.modalHeader}>
+                  <Text
+                    style={[
+                      styles.modalPercentage,
+                      { color: getMatchColor(selectedMatch.percentage) },
+                    ]}
+                  >
+                    {selectedMatch.percentage}% Match
+                  </Text>
+                  <Pressable onPress={() => setShowBreakdown(false)}>
+                    <Text style={styles.closeButton}>✕</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Why this match?</Text>
+                  {selectedMatch.reasons.map((reason, index) => (
+                    <View key={index} style={styles.reasonItem}>
+                      <Text style={styles.reasonBullet}>•</Text>
+                      <Text style={styles.reasonText}>{reason}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {selectedMatch.genreMatchNames.length > 0 && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Matching Genres</Text>
+                    <View style={styles.genreList}>
+                      {selectedMatch.genreMatchNames.map((genre, index) => (
+                        <View key={index} style={styles.genreChip}>
+                          <Text style={styles.genreChipText}>{genre}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Details</Text>
+                  <Text style={styles.detailText}>
+                    Category: {selectedMatch.ageCategory}
+                  </Text>
+                  <Text style={styles.detailText}>
+                    Rating: {selectedMatch.qualityScore.toFixed(1)}/10
+                  </Text>
+                  <Text style={styles.detailText}>
+                    Based on {selectedMatch.totalLikedMovies} movies you liked
+                  </Text>
+                </View>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -126,27 +242,42 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#fff",
+    marginBottom: 4,
   },
-  refineButtonContainer: {
-    backgroundColor: "#1a1a1a",
+  subtitle: {
+    fontSize: 14,
+    color: "#999",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#4caf50",
-    marginHorizontal: 16,
-    marginBottom: 16,
     alignItems: "center",
   },
-  refineButton: {
+  rateButton: {
+    backgroundColor: "#1a1a1a",
+    borderColor: "#4caf50",
+  },
+  refreshButton: {
+    backgroundColor: "#1a1a1a",
+    borderColor: "#666",
+  },
+  actionButtonText: {
     fontSize: 14,
-    color: "#4caf50",
+    color: "#fff",
     fontWeight: "600",
   },
   loadingText: {
@@ -166,10 +297,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   movieCard: {
-    flexDirection: "row",
-    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#222",
+  },
+  movieContent: {
+    flexDirection: "row",
+    padding: 16,
   },
   poster: {
     width: 100,
@@ -184,16 +317,114 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 12,
   },
   rating: {
     fontSize: 14,
     color: "#ffd700",
-    marginBottom: 8,
+  },
+  matchBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  matchText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   overview: {
     fontSize: 14,
     color: "#ccc",
     lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 16,
+    padding: 24,
+    width: "85%",
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333",
+  },
+  modalPercentage: {
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+  closeButton: {
+    fontSize: 24,
+    color: "#999",
+    padding: 4,
+  },
+  modalSection: {
+    marginBottom: 20,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+    marginBottom: 12,
+  },
+  reasonItem: {
+    flexDirection: "row",
+    marginBottom: 8,
+    paddingLeft: 4,
+  },
+  reasonBullet: {
+    color: "#4caf50",
+    fontSize: 16,
+    marginRight: 8,
+    fontWeight: "bold",
+  },
+  reasonText: {
+    flex: 1,
+    color: "#ccc",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  genreList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  genreChip: {
+    backgroundColor: "#2a2a2a",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#4caf50",
+  },
+  genreChipText: {
+    color: "#4caf50",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  detailText: {
+    color: "#999",
+    fontSize: 14,
+    marginBottom: 6,
   },
 });

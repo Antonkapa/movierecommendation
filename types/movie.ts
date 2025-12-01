@@ -13,6 +13,18 @@ export interface Movie {
   adult: boolean;
 }
 
+export interface Keyword {
+  id: number;
+  name: string;
+}
+
+export interface ProductionCompany {
+  id: number;
+  name: string;
+  logo_path: string | null;
+  origin_country: string;
+}
+
 export interface MovieDetails extends Movie {
   genres: Genre[];
   runtime: number | null;
@@ -21,6 +33,8 @@ export interface MovieDetails extends Movie {
   tagline: string;
   credits?: Credits;
   videos?: Videos;
+  keywords?: { keywords: Keyword[] };
+  production_companies?: ProductionCompany[];
 }
 
 export interface Genre {
@@ -67,4 +81,26 @@ export interface TMDBResponse<T> {
   results: T[];
   total_pages: number;
   total_results: number;
+}
+
+export interface MatchBreakdown {
+  percentage: number;
+  genreMatches: number;
+  genreMatchNames: string[];
+  keywordMatches: number;
+  keywordMatchNames: string[];
+  directorMatch: boolean;
+  directorName?: string;
+  actorMatches: number;
+  actorMatchNames: string[];
+  productionCompanyMatch: boolean;
+  productionCompanyName?: string;
+  qualityScore: number;
+  ageCategory: string;
+  totalLikedMovies: number;
+  reasons: string[];
+}
+
+export interface MovieWithMatch extends Movie {
+  matchScore?: MatchBreakdown;
 }

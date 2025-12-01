@@ -67,7 +67,11 @@ export default function ProfileScreen() {
   const dislikedCount = ratedMovies.filter((r) => r.rating === -1).length;
 
   const renderMovieCard = (item: UserRating, showRemove: boolean = false) => {
-    const movieData = item.movie_data ? JSON.parse(item.movie_data) : {};
+    const movieData = item.movie_data
+      ? typeof item.movie_data === 'string'
+        ? JSON.parse(item.movie_data)
+        : item.movie_data
+      : {};
 
     return (
       <Pressable

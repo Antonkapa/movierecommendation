@@ -24,7 +24,11 @@ export const groqService = {
 
     const likedTitles = likedMovies
       .map((r) => {
-        const data = r.movie_data ? JSON.parse(r.movie_data) : {};
+        const data = r.movie_data
+          ? typeof r.movie_data === 'string'
+            ? JSON.parse(r.movie_data)
+            : r.movie_data
+          : {};
         return data.title;
       })
       .filter(Boolean)
@@ -32,7 +36,11 @@ export const groqService = {
 
     const dislikedTitles = dislikedMovies
       .map((r) => {
-        const data = r.movie_data ? JSON.parse(r.movie_data) : {};
+        const data = r.movie_data
+          ? typeof r.movie_data === 'string'
+            ? JSON.parse(r.movie_data)
+            : r.movie_data
+          : {};
         return data.title;
       })
       .filter(Boolean)

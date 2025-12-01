@@ -35,10 +35,15 @@ export const tmdbService = {
   getMovieDetails: async (movieId: number): Promise<MovieDetails> => {
     const response = await api.get(`/movie/${movieId}`, {
       params: {
-        append_to_response: 'credits,videos',
+        append_to_response: 'credits,videos,keywords',
       },
     });
     return response.data;
+  },
+
+  getMovieKeywords: async (movieId: number): Promise<any> => {
+    const response = await api.get(`/movie/${movieId}/keywords`);
+    return response.data.keywords || [];
   },
 
   discoverMovies: async (params: {
@@ -48,6 +53,10 @@ export const tmdbService = {
     year?: number;
     minVoteCount?: number;
     minVoteAverage?: number;
+    keywords?: number[]; // Keyword IDs
+    cast?: number[]; // Actor IDs
+    crew?: number[]; // Crew member IDs (e.g., director)
+    companies?: number[]; // Production company IDs
   }): Promise<TMDBResponse<Movie>> => {
     const response = await api.get('/discover/movie', {
       params: {
@@ -57,9 +66,27 @@ export const tmdbService = {
         primary_release_year: params.year,
         'vote_count.gte': params.minVoteCount,
         'vote_average.gte': params.minVoteAverage,
+        with_keywords: params.keywords?.join(','),
+        with_cast: params.cast?.join(','),
+        with_crew: params.crew?.join(','),
+        with_companies: params.companies?.join(','),
       },
     });
     return response.data;
+  },
+
+  searchKeyword: async (query: string): Promise<any> => {
+    const response = await api.get('/search/keyword', {
+      params: { query },
+    });
+    return response.data.results || [];
+  },
+
+  searchPerson: async (query: string): Promise<any> => {
+    const response = await api.get('/search/person', {
+      params: { query },
+    });
+    return response.data.results || [];
   },
 
   getGenres: async (): Promise<Genre[]> => {
