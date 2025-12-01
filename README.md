@@ -26,11 +26,6 @@ An AI powered personalized movie recommendation mobile app built with Expo and R
 - **Favorite Genres**: See your top 3 favorite genres based on your ratings
 - **Statistics**: Track your rating activity
 
-### 🔐 Authentication
-- **Supabase Auth**: Secure authentication with email/password
-- **Session Management**: Persistent login sessions
-- **Protected Routes**: Automatic redirect to auth screen when not logged in
-
 ## 🛠️ Tech Stack
 
 - **Framework**: [Expo](https://expo.dev) with React Native
@@ -100,36 +95,6 @@ An AI powered personalized movie recommendation mobile app built with Expo and R
    - Press `i` for iOS simulator
    - Press `a` for Android emulator
    - Scan QR code with Expo Go app on your physical device
-
-## 📁 Project Structure
-
-```
-/
-├── app/                    # Expo Router screens
-│   ├── (tabs)/            # Tab navigation screens
-│   │   ├── index.tsx      # Home/Recommendations
-│   │   ├── search.tsx     # Search & Discovery
-│   │   ├── chat.tsx       # AI Chat
-│   │   └── profile.tsx    # User Profile
-│   ├── auth.tsx           # Authentication
-│   ├── onboarding.tsx    # Onboarding/Rating flow
-│   └── movie/[id].tsx     # Movie detail page
-├── components/            # Reusable components
-│   └── SwipeCard.tsx      # Swipeable movie card
-├── contexts/              # React Context providers
-│   └── AuthContext.tsx    # Authentication context
-├── services/              # Business logic services
-│   ├── database.ts        # Local SQLite database
-│   ├── tmdb.ts            # TMDB API integration
-│   ├── groq.ts            # Groq AI API integration
-│   └── recommendations.ts # Recommendation algorithm
-├── lib/                   # External library configs
-│   └── supabase.ts        # Supabase client
-├── types/                 # TypeScript type definitions
-│   └── movie.ts           # Movie-related types
-└── constants/             # App constants
-    └── config.ts          # Configuration values
-```
 
 ## 🔧 Key Services
 
@@ -203,6 +168,4 @@ This project is licensed under the 0BSD License.
 - [Groq](https://groq.com) for AI chat capabilities
 - [Expo](https://expo.dev) for the amazing development platform
 
----
 
-Built with ❤️ using Expo and React Native
